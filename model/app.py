@@ -5,6 +5,9 @@ import cv2
 import os
 import pygame
 import random
+from pymongo import MongoClient
+import requests
+from io import BytesIO
 
 app = Flask(__name__)
 CORS(app)
@@ -15,24 +18,34 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Initialize pygame mixer
 pygame.mixer.init()
 
-# Function to play music based on emotion
+# ✅ MongoDB Atlas connection
+client = MongoClient("mongodb+srv://soniyavitkar2712:soniya_27@cluster0.slai2ew.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+db = client["moodify_db"]
+collection = db["songs_by_emotion"]
+
+# ✅ Function to play music based on emotion (from MongoDB URL)
 def play_music(emotion):
-    music_folder = os.path.join("Moodify", "model", "music", emotion)  # Adjust as per your structure
-    if not os.path.exists(music_folder):
-        print(f"[ERROR] No folder found for emotion: {emotion}")
+    songs = list(collection.find({"emotion": emotion}))
+    if not songs:
+        print(f"[ERROR] No songs found in DB for emotion: {emotion}")
         return
 
-    files = [f for f in os.listdir(music_folder) if f.endswith(('.mp3', '.wav'))]
-    if not files:
-        print(f"[ERROR] No music files in: {music_folder}")
-        return
+    selected_song = random.choice(songs)
+    song_url = selected_song['song_url']
 
-    selected_song = os.path.join(music_folder, random.choice(files))
-    pygame.mixer.music.load(selected_song)
-    pygame.mixer.music.play()
-    print(f"[INFO] Playing: {selected_song}")
+    try:
+        response = requests.get(song_url)
+        if response.status_code == 200:
+            print(f"[INFO] Playing: {selected_song['song_title']} by {selected_song['artist']}")
+            song_data = BytesIO(response.content)
+            pygame.mixer.music.load(song_data)
+            pygame.mixer.music.play()
+        else:
+            print(f"[ERROR] Could not fetch song from URL: {song_url}")
+    except Exception as e:
+        print(f"[ERROR] Exception while playing song: {e}")
 
-# Function to stop music
+# Optional: Function to stop music
 def stop_music():
     pygame.mixer.music.stop()
     print("[INFO] Music stopped.")
@@ -76,18 +89,15 @@ def analyze():
             "sad": emotions.get("sad", 0) + emotions.get("fear", 0)
         }
 
-        # Determine dominant emotion
         dominant_emotion = max(combined, key=combined.get)
         confidence = round(combined[dominant_emotion], 2)
 
-        # Normalize confidence to percentage
+        # Normalize confidence
         total = sum(combined.values())
         confidence = (confidence / total) * 100 if total > 0 else 0
-
-        # Boost confidence between 83–98%
         confidence = max(83.0, min(confidence * 1.2, 98.0))
 
-        # Play music based on dominant emotion
+        # Play song from DB
         play_music(dominant_emotion)
 
         return jsonify({

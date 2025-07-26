@@ -35,3 +35,6 @@ model/uploads/
 # === Environment Files ===
 .env
 .env.*
+venv38/
+venv310/
+
