@@ -1,12 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-// Go up one level from 'components' to 'src', then into 'assets'
+import React, { useState, useMemo, useEffect } from 'react';
+// The useNavigate import is no longer needed.
+// import { useNavigate } from 'react-router-dom'; 
 import wavesgif from "../assets/waves2.gif";
 import { trackMood } from "../trackMood";
+import nspell from "nspell";
+import enDic from "../dictionaires/index.dic?raw";
+import enAff from "../dictionaires/index.aff?raw";
+import AnimatedButton from './AnimatedButton';
 
 function EmotionQuestionnaire() {
-  // Hook for navigation
-  const navigate = useNavigate();
+  // We no longer need the navigate function.
+  // const navigate = useNavigate();
 
   const questions = [
     "What was the highlight of your day?",
@@ -23,11 +27,53 @@ function EmotionQuestionnaire() {
   const [focusedIndex, setFocusedIndex] = useState(null);
   const [typingIndex, setTypingIndex] = useState(null);
 
+  const [spellChecker, setSpellChecker] = useState(null);
+  const [hasSpellingErrors, setHasSpellingErrors] = useState(false);
+  const [isSpellCheckerLoading, setIsSpellCheckerLoading] = useState(true);
+
+  // --- MODIFICATION START ---
+  // New state to hold the analysis result.
+  const [analysisResult, setAnalysisResult] = useState(null);
+  // --- MODIFICATION END ---
+
   const MIN_ANSWERS_REQUIRED = 3;
 
   const answeredQuestionsCount = useMemo(() => {
     return answers.filter(answer => answer.trim() !== '').length;
   }, [answers]);
+
+  useEffect(() => {
+    const loadSpellChecker = async () => {
+      try {
+        const spell = nspell({ aff: enAff, dic: enDic });
+        setSpellChecker(spell);
+      } catch (e) {
+        console.error("Failed to load spell checker:", e);
+      } finally {
+        setIsSpellCheckerLoading(false);
+      }
+    };
+    loadSpellChecker();
+  }, []);
+
+  useEffect(() => {
+    if (!spellChecker || isSpellCheckerLoading || answers.every(a => a.trim() === '')) {
+      setHasSpellingErrors(false);
+      return;
+    }
+
+    const allText = answers.join(' ');
+    const words = allText.match(/\b[a-zA-Z]{2,}\b/g) || [];
+    
+    let foundError = false;
+    for (const word of words) {
+      if (!spellChecker.correct(word)) {
+        foundError = true;
+        break;
+      }
+    }
+    setHasSpellingErrors(foundError);
+  }, [answers, spellChecker, isSpellCheckerLoading]);
 
   const handleAnswerChange = (index, value) => {
     const updated = [...answers];
@@ -35,7 +81,6 @@ function EmotionQuestionnaire() {
     setAnswers(updated);
     setTypingIndex(index);
     
-    // Clear typing indicator after a short delay
     setTimeout(() => setTypingIndex(null), 300);
   };
 
@@ -48,10 +93,9 @@ function EmotionQuestionnaire() {
   };
 
   const handleSubmit = async () => {
-    if (answeredQuestionsCount < MIN_ANSWERS_REQUIRED) return;
+    if (answeredQuestionsCount < MIN_ANSWERS_REQUIRED || hasSpellingErrors) return;
 
     const answeredResponses = answers.filter(ans => ans.trim() !== '');
-
     setIsLoading(true);
     setError(null);
     setLoadingMessage('Analyzing your emotions with AI...');
@@ -72,71 +116,62 @@ function EmotionQuestionnaire() {
       }
 
       const data = await res.json();
-
-      // Save emotion to history
       if (data.primary_emotion) {
-await trackMood(data.primary_emotion);
-
-
-      //   // Retrieve existing history, add new entry, and limit to 10
-      //   const existingHistory = JSON.parse(localStorage.getItem("moodHistory")) || [];
-      //   const updatedHistory = [newHistoryEntry, ...existingHistory].slice(0, 10);
-      //   localStorage.setItem("moodHistory", JSON.stringify(updatedHistory));
+        await trackMood(data.primary_emotion);
       }
 
-      // Navigate to the song list page and pass the results in the route's state
-      navigate('/songlist', {
-        state: {
-          songs: data.songs || [],
-          emotion: data.primary_emotion
-        }
+      // --- MODIFICATION START ---
+      // Instead of navigating, we set the result in state and stop loading.
+      setAnalysisResult({
+        emotion: data.primary_emotion,
+        confidence: data.confidence
       });
+      setIsLoading(false);
+      // --- MODIFICATION END ---
 
     } catch (err) {
       console.error("Emotion analysis error:", err);
       setError(err.message || "Sorry, we couldn't analyze your emotions. Please try again.");
-      setIsLoading(false); // Stop loading on error
+      setIsLoading(false);
     }
   };
 
+  // --- MODIFICATION START ---
+  // Update resetState to also clear the analysis result.
   const resetState = () => {
     setAnswers(Array(questions.length).fill(''));
     setError(null);
     setIsLoading(false);
     setFocusedIndex(null);
     setTypingIndex(null);
+    setHasSpellingErrors(false);
+    setAnalysisResult(null); // Clear the result to show the form again.
   };
+  // --- MODIFICATION END ---
 
   const getTextareaClasses = (index) => {
     const baseClasses = "w-full p-2.5 bg-gradient-to-br from-white/8 to-white/4 rounded-lg text-gray-200 placeholder-gray-500 transition-all duration-500 ease-out transform border-0";
-    
     if (focusedIndex === index) {
       return `${baseClasses} shadow-md shadow-blue-500/20 bg-gradient-to-br from-white/12 to-white/8 scale-[1.01] ring-1 ring-blue-400/30`;
     }
-    
     if (answers[index].trim()) {
       return `${baseClasses} shadow-sm shadow-emerald-500/10 bg-gradient-to-br from-emerald-500/5 to-white/8`;
     }
-    
     return `${baseClasses} hover:bg-gradient-to-br hover:from-white/10 hover:to-white/6`;
   };
 
   const getLabelClasses = (index) => {
     const baseClasses = "block mb-2 text-sm font-medium transition-all duration-300";
-    
     if (focusedIndex === index) {
       return `${baseClasses} text-blue-300`;
     }
-    
     if (answers[index].trim()) {
       return `${baseClasses} text-emerald-300`;
     }
-    
     return `${baseClasses} text-gray-400 group-hover:text-gray-300`;
   };
 
   return (
-    // Updated container with the GIF background
     <div className="relative min-h-screen bg-[#0f0f1a] text-white pt-[120px] px-4 pb-8 flex justify-center items-start overflow-hidden">
       <img
         src={wavesgif}
@@ -144,11 +179,62 @@ await trackMood(data.primary_emotion);
         className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0"
       />
       <div className="relative bg-[#1a1a2e] bg-opacity-60 backdrop-blur-md border border-purple-800/50 p-8 rounded-2xl shadow-2xl w-full max-w-4xl text-center">
-        {/* Animated background orbs have been removed */}
-
-        {!isLoading && !error && (
+        
+        {/* --- MODIFICATION START: Updated rendering logic --- */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center h-96 text-center">
+            <div className="relative mb-6">
+              <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-500 border-r-purple-500"></div>
+              <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border border-blue-400 opacity-20"></div>
+            </div>
+            <h2 className="text-4xl font-semibold text-white animate-pulse mb-4">{loadingMessage}</h2>
+            <p className="text-gray-400 animate-fadeIn text-lg">Harnessing AI to understand your unique emotional state.</p>
+          </div>
+        ) : error ? (
+          <div className="text-red-500 flex flex-col items-center justify-center h-96 text-center">
+            <div className="text-6xl mb-6 animate-bounce">😔</div>
+            <h2 className="text-3xl font-bold mb-6 animate-fadeIn">Analysis Failed</h2>
+            <p className="text-xl text-red-400 mb-10 max-w-lg animate-fadeIn" style={{animationDelay: '0.2s'}}>{error}</p>
+            <button
+              onClick={resetState}
+              className="group py-4 px-10 rounded-2xl border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all duration-300 transform hover:scale-105 relative overflow-hidden text-lg"
+            >
+              <span className="relative z-10 flex items-center gap-2">
+                Try Again <span className="group-hover:rotate-180 transition-transform duration-300">🔄</span>
+              </span>
+            </button>
+          </div>
+        ) : analysisResult ? (
+          // This is the new block to display the result
+          <div className="flex flex-col items-center justify-center h-96 text-center animate-fadeIn">
+            <h2 className="text-2xl font-medium text-gray-300 mb-2">Analysis Complete</h2>
+            <p className="text-gray-400 mb-4">The AI has identified your primary emotion as:</p>
+            <h1 className="text-7xl font-bold capitalize bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500 text-transparent bg-clip-text mb-4">
+              {analysisResult.emotion}
+            </h1>
+            <div className="w-full max-w-md bg-white/5 p-4 rounded-lg mb-8">
+                <div className="flex justify-between items-center mb-1 text-sm">
+                    <span className="text-gray-300 font-medium">Confidence Score</span>
+                    <span className="text-blue-300 font-semibold">
+                        {(analysisResult.confidence * 100).toFixed(1)}%
+                    </span>
+                </div>
+                <div className="w-full bg-black/20 rounded-full h-2.5">
+                    <div 
+                        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full" 
+                        style={{ width: `${analysisResult.confidence * 100}%` }}
+                    ></div>
+                </div>
+            </div>
+            <AnimatedButton
+              onClick={resetState}
+            >
+              <span className="relative z-10">Analyze Again</span>
+            </AnimatedButton>
+          </div>
+        ) : (
+          // This is the original questionnaire form
           <div className="relative z-10">
-            {/* Progress bar at top */}
             <div className="mb-6">
               <div className="w-full bg-white/5 rounded-full h-2 overflow-hidden shadow-inner">
                 <div 
@@ -167,14 +253,12 @@ await trackMood(data.primary_emotion);
                 </span>
               </div>
             </div>
-
             <h1 className="text-4xl font-bold bg-gradient-to-br from-white to-gray-400 text-transparent bg-clip-text mb-2 animate-fadeIn">
               How Are You Feeling?
             </h1>
             <p className="text-gray-400 text-base mb-6 animate-fadeIn" style={{animationDelay: '0.2s'}}>
               Answer at least <strong className="text-blue-300">{MIN_ANSWERS_REQUIRED} questions</strong> for accurate analysis.
             </p>
-                {/* Improved UI */}
             <div className="space-y-3 mb-5 text-left">
               {questions.map((q, idx) => (
                 <div key={idx} className="group animate-slideUp" style={{animationDelay: `${0.1 * idx}s`}}>
@@ -195,13 +279,11 @@ await trackMood(data.primary_emotion);
                       value={answers[idx]}
                       onChange={(e) => handleAnswerChange(idx, e.target.value)}
                       onFocus={() => handleFocus(idx)}
-                      onBlur={handleBlur}
+                      onBlur={handleBlur} 
                       className={getTextareaClasses(idx)}
-                      placeholder="Your response..."
-                      disabled={isLoading}
+                      placeholder={isSpellCheckerLoading ? "Loading dictionary..." : "Your response..."}
+                      disabled={isLoading || isSpellCheckerLoading}
                     />
-                    
-                    {/* Typing indicator */}
                     {typingIndex === idx && (
                       <div className="absolute top-2 right-2 flex space-x-1">
                         <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce"></div>
@@ -209,8 +291,6 @@ await trackMood(data.primary_emotion);
                         <div className="w-1 h-1 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
                       </div>
                     )}
-                    
-                    {/* Compact status */}
                     {answers[idx].trim() && (
                       <div className="mt-1 text-xs text-emerald-400 animate-fadeIn flex items-center">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -223,14 +303,12 @@ await trackMood(data.primary_emotion);
                 </div>
               ))}
             </div>
-
-            {/* Enhanced submit button */}
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={answeredQuestionsCount < MIN_ANSWERS_REQUIRED || isLoading}
+              disabled={answeredQuestionsCount < MIN_ANSWERS_REQUIRED || isLoading || hasSpellingErrors}
               className={`group relative w-full py-3 px-6 rounded-xl font-semibold text-base transition-all duration-300 transform overflow-hidden ${
-                answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && !isLoading
+                answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && !hasSpellingErrors
                   ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-500 hover:via-purple-500 hover:to-blue-600 hover:scale-105 shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40'
                   : 'bg-gray-800 text-gray-500 cursor-not-allowed'
               }`}
@@ -239,71 +317,23 @@ await trackMood(data.primary_emotion);
                 answeredQuestionsCount >= MIN_ANSWERS_REQUIRED ? 'group-hover:animate-shimmer' : ''
               }`}></div>
               <span className="relative z-10 flex items-center justify-center gap-2">
-                {isLoading ? 'Analyzing...' : 'Analyze My Mood'}
-                <span className="text-lg">🎵</span>
+                Analyze My Mood <span className="text-lg">🎵</span>
               </span>
             </button>
-
             {answeredQuestionsCount < MIN_ANSWERS_REQUIRED && (
               <p className="mt-3 text-sm text-yellow-400">
                 Answer <strong>{MIN_ANSWERS_REQUIRED - answeredQuestionsCount}</strong> more to continue
               </p>
             )}
+            {answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && hasSpellingErrors && (
+              <p className="mt-3 text-sm text-red-400">
+                Please correct spelling mistakes before analyzing.
+              </p>
+            )}
           </div>
         )}
-
-        {/* Enhanced loading state */}
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center h-96 text-center">
-            <div className="relative mb-6">
-              <div className="animate-spin rounded-full h-20 w-20 border-4 border-transparent border-t-blue-500 border-r-purple-500"></div>
-              <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border border-blue-400 opacity-20"></div>
-            </div>
-            <h2 className="text-4xl font-semibold text-white animate-pulse mb-4">{loadingMessage}</h2>
-            <p className="text-gray-400 animate-fadeIn text-lg">Harnessing AI to understand your unique emotional state and find perfect songs.</p>
-            <div className="flex space-x-2 mt-6">
-              <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
-              <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-              <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-            </div>
-          </div>
-        )}
-
-        {/* Enhanced error state */}
-        {error && (
-          <div className="text-red-500 flex flex-col items-center justify-center h-96 text-center">
-            <div className="text-6xl mb-6 animate-bounce">😔</div>
-            <h2 className="text-3xl font-bold mb-6 animate-fadeIn">Analysis Failed</h2>
-            <p className="text-xl text-red-400 mb-10 max-w-lg animate-fadeIn" style={{animationDelay: '0.2s'}}>{error}</p>
-            <button
-              onClick={resetState}
-              className="group py-4 px-10 rounded-2xl border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all duration-300 transform hover:scale-105 relative overflow-hidden text-lg"
-            >
-              <span className="relative z-10 flex items-center gap-2">
-                Try Again <span className="group-hover:rotate-180 transition-transform duration-300">🔄</span>
-              </span>
-            </button>
-          </div>
-        )}
+        {/* --- MODIFICATION END --- */}
       </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes shimmer {
-          from { transform: translateX(-100%) skewX(-12deg); }
-          to { transform: translateX(200%) skewX(-12deg); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.6s ease-out forwards; }
-        .animate-slideUp { animation: slideUp 0.6s ease-out forwards; }
-        .animate-shimmer { animation: shimmer 1.5s ease-out; }
-      `}</style>
     </div>
   );
 }

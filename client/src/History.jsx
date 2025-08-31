@@ -1,3 +1,4 @@
+
 import { motion } from "framer-motion";
 import { TypeAnimation } from "react-type-animation";
 import Footer from "./components/Footer";
@@ -39,10 +40,75 @@ const moodIcons = {
   neutral: "😐",
   surprised: "😲",
 };
+const moodJokes = {
+  Happy: [
+    "Happiness is contagious—so are your dance moves! 💃",
+    "Joy is louder when shared. Pass it on like a favorite song 🎶",
+    "Smile! It confuses people sometimes 😜",
+    "You’re not just in a good mood — you’re the mood everyone wants to be in ☀️",
+    "Keep shining! The world needs your sparkle ✨",
+  ],
+  Sad: [
+    "It’s okay to feel lost. Even stars need darkness to shine.",
+    "Even rain clouds eventually let the sun through ☀️",
+    "Tears are words the heart can't say aloud 💙",
+    "A bad day is just a plot twist in your story 📖",
+    "The night doesn’t last forever — even the moon makes way for morning.",
+  ],
+  Angry: [
+    "Take a deep breath… then another 🧘‍♂️",
+    "Your fire is valid — just don’t let it burn you out 🔥",
+    "Punch a pillow, not a person! 🥊",
+    "Anger is temporary, pizza is forever 🍕",
+    "Count to ten, then maybe twenty… or just hug a dog 🐶",
+  ],
+  Neutral: [
+    "Stillness is a mood too. Let it be quiet and kind.🌾",
+    "A calm mind is like a clear sky 🌌",
+    "Try something new today—it’s just 5 minutes away ⏱️",
+    "Coffee first, adulting later ☕",
+    
+  ],
+  Surprised: [
+    
+    "Expect the unexpected ",
+    "Surprises are like confetti for the soul 🎉",
+    "Life’s full of twists, just like a rollercoaster 🎢",
+    "Wow! Did that just happen? 😲",
+  ],
+};
 
+// Shuffle function to get a random joke for the mood
+const getRandomMoodTip = (mood) => {
+  const jokes = moodJokes[mood] || ["Stay curious and explore! 🌟"];
+  const shuffled = jokes.sort(() => Math.random() - 0.5);
+  return shuffled[0]; // return one random tip
+};
+
+// MoodAI component
+const MoodAI = ({ mood }) => {
+  const [aiTip, setAiTip] = useState("Analyzing your mood... 🤔");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAiTip(getRandomMoodTip(mood));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [mood]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-6 p-4 bg-white/10 rounded-xl text-gray-200 font-semibold text-lg text-center"
+    >
+      {aiTip}
+    </motion.div>
+  );
+};
 // --- REUSABLE UI COMPONENTS ---
 
-// Animated background bubble component
 const Bubble = ({ className }) => (
   <div className={`absolute rounded-full filter blur-3xl animate-pulse ${className}`} />
 );
@@ -83,12 +149,10 @@ const Hero = () => (
 const MoodCharts = ({ moodHistory }) => {
   if (!moodHistory.length) return null;
 
+  const sortedHistory = [...moodHistory].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+  );
 
-  const sortedHistory = [...moodHistory].sort((a, b) => 
-  new Date(a.timestamp) - new Date(b.timestamp)
-);
-
-  // Process data for charts
   const moodCounts = moodHistory.reduce((acc, mood) => {
     acc[mood.emotion] = (acc[mood.emotion] || 0) + 1;
     return acc;
@@ -98,23 +162,16 @@ const MoodCharts = ({ moodHistory }) => {
   const moodData = Object.values(moodCounts);
 
   const trendLabels = sortedHistory.map((m) =>
-  new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-);
-const trendData = sortedHistory.map((m) => m.emotion);
-
+    new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  );
+  const trendData = sortedHistory.map((m) => m.emotion);
 
   const moodMap = { happy: 3, sad: 1, angry: 0, neutral: 2, surprised: 4 };
-  // const trendValues = trendData.map((m) => moodMap[m.toLowerCase()] || 2);
   const trendValues = trendData.map((m) => {
-  const lowerCaseMood = m.toLowerCase();
+    const lowerCaseMood = m.toLowerCase();
+    return moodMap.hasOwnProperty(lowerCaseMood) ? moodMap[lowerCaseMood] : 2;
+  });
 
-   if (moodMap.hasOwnProperty(lowerCaseMood)) {
-      return moodMap[lowerCaseMood];
-    }
-   return 2; 
-});
-
-  // Custom Chart.js plugin to render emojis on line chart points
   const pointEmojiPlugin = {
     id: "pointEmojiPlugin",
     afterDatasetsDraw: (chart) => {
@@ -159,62 +216,73 @@ console.log("Trend Values (mapped numbers):", trendValues);
         <Card>
           <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Frequency</h3>
           <Bar
-  data={{
-    labels: moodLabels,
-    datasets: [
-      {
-        label: "Count",
-        data: moodData,
-        backgroundColor: moodLabels.map((m) =>
-  m === "happy" ? "rgba(168, 85, 247, 0.7)" :
-  m === "sad" ? "rgba(147, 51, 234, 0.7)" :
-  m === "angry" ? "rgba(139, 92, 246, 0.7)" :
-  m === "neutral" ? "rgba(124, 58, 237, 0.7)" :
-  m === "surprised" ? "rgba(167, 139, 250, 0.7)" :
-  "rgba(168, 85, 247, 0.7)"
-),
-        borderColor: "transparent",
-        borderWidth: 2,
-        borderRadius: 20,
-        hoverBackgroundColor: moodLabels.map((m) =>
-  m === "happy" ? "rgba(168, 85, 247, 1)" :
-  m === "sad" ? "rgba(147, 51, 234, 1)" :
-  m === "angry" ? "rgba(139, 92, 246, 1)" :
-  m === "neutral" ? "rgba(124, 58, 237, 1)" :
-  m === "surprised" ? "rgba(167, 139, 250, 1)" :
-  "rgba(168, 85, 247, 1)"
-),
-      },
-    ],
-  }}
-  options={{
-    responsive: true,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: (tooltipItem) => {
-            const emoji = moodIcons[tooltipItem.label.toLowerCase()] || "";
-            return `${emoji} ${tooltipItem.label}: ${tooltipItem.raw}`;
-          },
-        },
-      },
-    },
-    scales: {
-      y: { 
-        grid: { color: 'rgba(255, 255, 255, 0.1)' }, 
-        ticks: { color: '#d1d5db', stepSize: 1 } 
-      },
-      x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#d1d5db' } }
-    },
-  }}
-/>
-
+            data={{
+              labels: moodLabels,
+              datasets: [
+                {
+                  label: "Count",
+                  data: moodData,
+                  backgroundColor: moodLabels.map((m) =>
+                    m === "happy"
+                      ? "rgba(168, 85, 247, 0.7)"
+                      : m === "sad"
+                      ? "rgba(147, 51, 234, 0.7)"
+                      : m === "angry"
+                      ? "rgba(139, 92, 246, 0.7)"
+                      : m === "neutral"
+                      ? "rgba(124, 58, 237, 0.7)"
+                      : "rgba(167, 139, 250, 0.7)"
+                      
+                  ),
+                  borderColor: "transparent",
+                  borderWidth: 2,
+                  borderRadius: 20,
+                  hoverBackgroundColor: moodLabels.map((m) =>
+                    m === "happy"
+                      ? "rgba(168, 85, 247, 1)"
+                      : m === "sad"
+                      ? "rgba(147, 51, 234, 1)"
+                      : m === "angry"
+                      ? "rgba(139, 92, 246, 1)"
+                      : m === "neutral"
+                      ? "rgba(124, 58, 237, 1)"
+                      :  "rgba(167, 139, 250, 1)"
+                      
+                  ),
+                },
+              ],
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    label: (tooltipItem) => {
+                      const emoji =
+                        moodIcons[tooltipItem.label.toLowerCase()] || "";
+                      return `${emoji} ${tooltipItem.label}: ${tooltipItem.raw}`;
+                    },
+                  },
+                },
+              },
+              scales: {
+                y: {
+                  grid: { color: "rgba(255, 255, 255, 0.1)" },
+                  ticks: { color: "#d1d5db", stepSize: 1 },
+                },
+                x: {
+                  grid: { color: "rgba(255, 255, 255, 0.05)" },
+                  ticks: { color: "#d1d5db" },
+                },
+              },
+            }}
+          />
         </Card>
 
         {/* Line Chart */}
-        <Card>
-          <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Trend</h3>
+       <Card>
+    <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Trend</h3>
           <Line
             plugins={[pointEmojiPlugin]}
             data={{
@@ -271,9 +339,6 @@ console.log("Trend Values (mapped numbers):", trendValues);
     </motion.div>
   );
 };
-
-
-
 const MostPrevalentMood = ({ moodHistory }) => {
   const navigate = useNavigate(); // initialize navigate
 
@@ -345,24 +410,24 @@ const MostPrevalentMood = ({ moodHistory }) => {
 
 export default function History() {
 const [moodHistory, setMoodHistory] = useState([]);
- const { session } = useAuth();
+  const { session } = useAuth();
 
- useEffect(() => {
-  const load = async () => {
-    try {
-       if (session?.user?.id) {
-        const data = await fetchHistory(session.user.id, 10);
-        setMoodHistory(data);
-      } else {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        if (session?.user?.id) {
+          const data = await fetchHistory(session.user.id, 10);
+          setMoodHistory(data);
+        } else {
+          setMoodHistory(getGuestHistory());
+        }
+      } catch (e) {
+        console.error("History load failed, falling back to local:", e);
         setMoodHistory(getGuestHistory());
-       }
-     } catch (e) {
-      console.error("History load failed, falling back to local:", e);
-        setMoodHistory(getGuestHistory());
-     }
-   };
-   load();
- }, [session?.user?.id]);
+      }
+    };
+    load();
+  }, [session?.user?.id]);
 
   return (
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-[#0f0f1a] via-[#1a1a2e] to-[#0f0f1a] text-white font-sans overflow-x-hidden">
