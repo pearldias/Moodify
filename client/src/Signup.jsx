@@ -66,10 +66,10 @@ if (uid) {
                     className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none z-0"
             /> 
       <div className="w-full max-w-md bg-white/5 backdrop-blur rounded-2xl p-8 shadow-xl border border-white/10 mt-12 mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-6">Create your account</h1>
+        <h1 className="text-2xl font-bold text-white mb-6 text-center">Create Account</h1>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* Name */}
+          
           <div>
             <label className="text-sm text-gray-300">Name</label>
             <div className="mt-1 flex items-center bg-white/10 rounded-lg px-3">
@@ -98,7 +98,7 @@ if (uid) {
             {errors.email && <p className="text-pink-400 text-xs mt-1">{errors.email.message}</p>}
           </div>
 
-          {/* Password */}
+          
           <div>
             <label className="text-sm text-gray-300">Password</label>
             <div className="mt-1 flex items-center bg-white/10 rounded-lg px-3">
@@ -127,7 +127,7 @@ if (uid) {
           </button>
         </form>
 
-        <p className="text-gray-300 text-sm mt-4">
+        <p className="text-gray-300 text-sm mt-4 text-center">
           Already have an account?{" "}
           <Link to="/signin" className="text-purple-300 underline">Sign in</Link>
         </p>

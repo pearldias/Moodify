@@ -4,6 +4,8 @@ import GlowCard from "./components/GlowCard"; // Import the new card component
 import Footer from "./components/Footer";
 import AnimatedButton from "./components/AnimatedButton";
 import { useNavigate } from "react-router-dom";
+
+
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },
   visible: {
@@ -30,12 +32,12 @@ const steps = [
   {
     step: "01",
     title: "Record Your Emotions",
-    description: "Use your device's camera to record your facial expressions or upload a video to detect your emotions.",
+    description: "Choose between live video, uploaded clips, or a quick questionnaire",
   },
   {
     step: "02", 
     title: "Analyze Your Emotions",
-    description: "Our advanced algorithm will analyze your facial expressions and determine your current mood.",
+    description: "Our algorithm will decode your mood with clarity and care.",
   },
   {
     step: "03",
@@ -50,10 +52,10 @@ const steps = [
 ];
 
 export default function HowItWorks() {
-  const navigate = useNavigate();
+  
   const cardsRef = useRef(null);
   const isInView = useInView(cardsRef, { once: true, margin: "-100px" });
-
+  const navigate = useNavigate();
   return (
     <section className="w-full min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-[#0f0f1a] to-[#1a1a2e] px-4 py-32 text-center relative overflow-hidden font-[Inter]">
       

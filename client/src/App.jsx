@@ -1,3 +1,4 @@
+
 import React ,{ useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from "./AuthContext";
@@ -20,6 +21,10 @@ import { Toaster } from "react-hot-toast";
 import AccountTypeSelection from './AccountTypeSelection';
 import SigninAdmin from './SigninAdmin';
 import { initGuestSession } from "./historyLocal";
+import FullscreenToggle from "./components/FullScreenToggle";
+import FullScreenBackButton from "./components/FullScreenBackButton";
+import MobileBackButton from "./components/MobileBackButton";
+
 
 
 function AppContent() {
@@ -35,6 +40,7 @@ function AppContent() {
   return (
     <>
       <Navbar />
+      
       <div className="">
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -53,6 +59,10 @@ function AppContent() {
           <Route path="/signin-admin" element={<SigninAdmin />} />
         </Routes>
       </div>
+      
+      <MobileBackButton />
+      <FullScreenBackButton/>
+      <FullscreenToggle />
       {showFooter && <Footer />}
       <Toaster position="top-center" reverseOrder={false} />
     </>
