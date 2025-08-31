@@ -3,6 +3,7 @@ import { TypeAnimation } from "react-type-animation";
 import Footer from "./components/Footer";
 import { useEffect, useState } from "react";
 import { Bar, Line } from "react-chartjs-2";
+import { useNavigate } from "react-router-dom"; 
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,8 +15,11 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
+import AnimatedButton from "./components/AnimatedButton"; 
+import { useAuth } from "./AuthContext";
+import { fetchHistory } from "./historyApi";
+import { getGuestHistory } from "./historyLocal";
 
-// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -34,7 +38,6 @@ const moodIcons = {
   neutral: "😐",
   surprised: "😲",
 };
-
 const moodJokes = {
   Happy: [
     "Happiness is contagious—so are your dance moves! 💃",
@@ -102,13 +105,12 @@ const MoodAI = ({ mood }) => {
     </motion.div>
   );
 };
+// --- REUSABLE UI COMPONENTS ---
 
-// Bubble background component
 const Bubble = ({ className }) => (
   <div className={`absolute rounded-full filter blur-3xl animate-pulse ${className}`} />
 );
 
-// Card component wrapper
 const Card = ({ children, className }) => (
   <motion.div
     variants={{
@@ -122,7 +124,8 @@ const Card = ({ children, className }) => (
   </motion.div>
 );
 
-// Hero section
+// --- PAGE SECTIONS ---
+
 const Hero = () => (
   <motion.div
     initial={{ opacity: 0, y: -20 }}
@@ -146,9 +149,12 @@ const Hero = () => (
   </motion.div>
 );
 
-// Mood charts component
 const MoodCharts = ({ moodHistory }) => {
   if (!moodHistory.length) return null;
+
+  const sortedHistory = [...moodHistory].sort(
+    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+  );
 
   const moodCounts = moodHistory.reduce((acc, mood) => {
     acc[mood.emotion] = (acc[mood.emotion] || 0) + 1;
@@ -158,13 +164,16 @@ const MoodCharts = ({ moodHistory }) => {
   const moodLabels = Object.keys(moodCounts);
   const moodData = Object.values(moodCounts);
 
-  const trendLabels = moodHistory.map((m) =>
+  const trendLabels = sortedHistory.map((m) =>
     new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   );
-  const trendData = moodHistory.map((m) => m.emotion);
+  const trendData = sortedHistory.map((m) => m.emotion);
 
-  const moodMap = { angry: 0, sad: 1, neutral: 2, happy: 3, surprised: 4 };
-  const trendValues = trendData.map((m) => moodMap[m.toLowerCase()] ?? 2);
+  const moodMap = { happy: 3, sad: 1, angry: 0, neutral: 2, surprised: 4 };
+  const trendValues = trendData.map((m) => {
+    const lowerCaseMood = m.toLowerCase();
+    return moodMap.hasOwnProperty(lowerCaseMood) ? moodMap[lowerCaseMood] : 2;
+  });
 
   const pointEmojiPlugin = {
     id: "pointEmojiPlugin",
@@ -188,13 +197,20 @@ const MoodCharts = ({ moodHistory }) => {
 
   return (
     <motion.div
-      variants={{ hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.2 } } }}
+      variants={{
+        hidden: { opacity: 0 },
+        visible: {
+          opacity: 1,
+          transition: { staggerChildren: 0.2 },
+        },
+      }}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       className="max-w-5xl mx-auto mb-16"
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Bar Chart */}
         <Card>
           <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Frequency</h3>
           <Bar
@@ -214,6 +230,7 @@ const MoodCharts = ({ moodHistory }) => {
                       : m === "neutral"
                       ? "rgba(124, 58, 237, 0.7)"
                       : "rgba(167, 139, 250, 0.7)"
+                      
                   ),
                   borderColor: "transparent",
                   borderWidth: 2,
@@ -227,7 +244,8 @@ const MoodCharts = ({ moodHistory }) => {
                       ? "rgba(139, 92, 246, 1)"
                       : m === "neutral"
                       ? "rgba(124, 58, 237, 1)"
-                      : "rgba(167, 139, 250, 1)"
+                      :  "rgba(167, 139, 250, 1)"
+                      
                   ),
                 },
               ],
@@ -239,22 +257,30 @@ const MoodCharts = ({ moodHistory }) => {
                 tooltip: {
                   callbacks: {
                     label: (tooltipItem) => {
-                      const emoji = moodIcons[tooltipItem.label.toLowerCase()] || "";
+                      const emoji =
+                        moodIcons[tooltipItem.label.toLowerCase()] || "";
                       return `${emoji} ${tooltipItem.label}: ${tooltipItem.raw}`;
                     },
                   },
                 },
               },
               scales: {
-                y: { grid: { color: "rgba(255, 255, 255, 0.1)" }, ticks: { color: "#d1d5db", stepSize: 1 } },
-                x: { grid: { color: "rgba(255, 255, 255, 0.05)" }, ticks: { color: "#d1d5db" } },
+                y: {
+                  grid: { color: "rgba(255, 255, 255, 0.1)" },
+                  ticks: { color: "#d1d5db", stepSize: 1 },
+                },
+                x: {
+                  grid: { color: "rgba(255, 255, 255, 0.05)" },
+                  ticks: { color: "#d1d5db" },
+                },
               },
             }}
           />
         </Card>
 
-        <Card>
-          <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Trend</h3>
+        {/* Line Chart */}
+       <Card>
+    <h3 className="text-xl font-bold mb-4 text-center text-gray-200">Mood Trend</h3>
           <Line
             plugins={[pointEmojiPlugin]}
             data={{
@@ -311,8 +337,6 @@ const MoodCharts = ({ moodHistory }) => {
     </motion.div>
   );
 };
-
-// Most prevalent mood component
 const MostPrevalentMood = ({ moodHistory }) => {
   if (!moodHistory.length) return null;
 
@@ -399,12 +423,25 @@ const MostPrevalentMood = ({ moodHistory }) => {
   );
 };
 export default function History() {
-  const [moodHistory, setMoodHistory] = useState([]);
+const [moodHistory, setMoodHistory] = useState([]);
+  const { session } = useAuth();
 
   useEffect(() => {
-    const history = JSON.parse(localStorage.getItem("moodHistory")) || [];
-    setMoodHistory(history);
-  }, []);
+    const load = async () => {
+      try {
+        if (session?.user?.id) {
+          const data = await fetchHistory(session.user.id, 10);
+          setMoodHistory(data);
+        } else {
+          setMoodHistory(getGuestHistory());
+        }
+      } catch (e) {
+        console.error("History load failed, falling back to local:", e);
+        setMoodHistory(getGuestHistory());
+      }
+    };
+    load();
+  }, [session?.user?.id]);
 
   return (
     <div className="relative flex flex-col min-h-screen bg-gradient-to-b from-[#0f0f1a] via-[#1a1a2e] to-[#0f0f1a] text-white font-sans overflow-x-hidden">
@@ -429,6 +466,7 @@ export default function History() {
         )}
       </main>
       <Footer />
+      {/* conflict resolved */}
     </div>
   );
 }

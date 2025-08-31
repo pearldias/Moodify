@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import random
 import certifi
+from textblob import TextBlob # --- NEW ---
 
 # --- Set up logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -64,7 +65,6 @@ def initialize_model():
             model=model_name,
             tokenizer=model_name,
             device=0 if device == "cuda" else -1,
-            # Updated to use top_k=None instead of the deprecated return_all_scores
             top_k=None,
             max_length=512,
             truncation=True
@@ -87,6 +87,20 @@ def combine_responses(responses):
         combined_text = " ".join(words[:400])
     return combined_text
 
+# --- NEW: Function to correct spelling ---
+def correct_spelling(text):
+    """Corrects spelling mistakes in the input text using TextBlob."""
+    if not text:
+        return ""
+    try:
+        # Create a TextBlob object and call the correct() method
+        corrected_blob = TextBlob(text).correct()
+        return str(corrected_blob)
+    except Exception as e:
+        logger.error(f"Error during spelling correction: {e}")
+        # Fallback to original text if correction fails
+        return text
+
 def fetch_songs_by_emotion(emotion, limit=20):
     """Fetch songs from MongoDB based on emotion with enhanced logging."""
     try:
@@ -97,7 +111,6 @@ def fetch_songs_by_emotion(emotion, limit=20):
         
         if not songs:
             logger.warning(f"Query returned 0 songs for filter: {query_filter}")
-            # For debugging, let's see if any documents exist with a similar emotion (e.g., case difference)
             case_insensitive_filter = {"emotion": {"$regex": f"^{emotion}$", "$options": "i"}}
             case_insensitive_count = songs_collection.count_documents(case_insensitive_filter)
             if case_insensitive_count > 0:
@@ -161,11 +174,18 @@ def predict_emotion():
         if not data or 'responses' not in data:
             return jsonify({'error': 'Invalid input. Provide "responses" field in JSON.'}), 400
 
-        text = combine_responses(data.get('responses', []))
-        if not text.strip():
+        original_text = combine_responses(data.get('responses', []))
+        if not original_text.strip():
             return jsonify({'error': 'Input text is empty after processing.'}), 400
 
-        final_emotions = process_emotion_predictions(text)
+        # --- MODIFIED: Add spelling correction step ---
+        logger.info(f"Original text received: '{original_text}'")
+        corrected_text = correct_spelling(original_text)
+        logger.info(f"Text after spell correction: '{corrected_text}'")
+
+        final_emotions = process_emotion_predictions(corrected_text)
+        # --- END MODIFICATION ---
+        
         if not final_emotions:
             return jsonify({'error': 'Could not determine a relevant emotion from the provided text.'}), 400
 
@@ -174,11 +194,13 @@ def predict_emotion():
         
         songs = fetch_songs_by_emotion(primary_emotion)
 
+        # --- MODIFIED: Add corrected text to the response for clarity ---
         return jsonify({
             'primary_emotion': primary_emotion,
             'confidence': primary_emotion_obj['confidence'],
             'all_emotions': final_emotions,
-            'original_text_preview': text[:150] + ('...' if len(text) > 150 else ''),
+            'original_text_preview': original_text[:150] + ('...' if len(original_text) > 150 else ''),
+            'corrected_text_preview': corrected_text[:150] + ('...' if len(corrected_text) > 150 else ''),
             'songs': songs,
             'songs_count': len(songs)
         })
@@ -186,8 +208,6 @@ def predict_emotion():
     except Exception as e:
         logger.error(f"Error in prediction endpoint: {e}")
         return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
-
-# Other endpoints remain the same...
 
 @app.route('/text_emotion/predict', methods=['POST'])
 def predict_emotion_text():
@@ -197,18 +217,30 @@ def predict_emotion_text():
         data = request.get_json()
         if not data or 'responses' not in data:
             return jsonify({'error': 'Invalid input. Provide "responses" field in JSON.'}), 400
-        text = combine_responses(data.get('responses', []))
-        if not text.strip():
+        
+        original_text = combine_responses(data.get('responses', []))
+        if not original_text.strip():
             return jsonify({'error': 'Input text is empty after processing.'}), 400
-        final_emotions = process_emotion_predictions(text)
+
+        # --- MODIFIED: Add spelling correction step ---
+        logger.info(f"Original text received: '{original_text}'")
+        corrected_text = correct_spelling(original_text)
+        logger.info(f"Text after spell correction: '{corrected_text}'")
+
+        final_emotions = process_emotion_predictions(corrected_text)
+        # --- END MODIFICATION ---
+
         if not final_emotions:
             return jsonify({'error': 'Could not determine a relevant emotion from the provided text.'}), 400
         primary_emotion_obj = final_emotions[0]
+
+        # --- MODIFIED: Add corrected text to the response for clarity ---
         return jsonify({
             'primary_emotion': primary_emotion_obj['emotion'],
             'confidence': primary_emotion_obj['confidence'],
             'all_emotions': final_emotions,
-            'original_text_preview': text[:150] + ('...' if len(text) > 150 else '')
+            'original_text_preview': original_text[:150] + ('...' if len(original_text) > 150 else ''),
+            'corrected_text_preview': corrected_text[:150] + ('...' if len(corrected_text) > 150 else '')
         })
     except Exception as e:
         logger.error(f"Error in text_emotion prediction: {e}")
