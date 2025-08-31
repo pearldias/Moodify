@@ -1,12 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 // The useNavigate import is no longer needed.
 // import { useNavigate } from 'react-router-dom'; 
 import wavesgif from "../assets/waves2.gif";
 import { trackMood } from "../trackMood";
-import nspell from "nspell";
-import enDic from "../dictionaires/index.dic?raw";
-import enAff from "../dictionaires/index.aff?raw";
-import AnimatedButton from './AnimatedButton';
 
 function EmotionQuestionnaire() {
   // We no longer need the navigate function.
@@ -27,10 +23,6 @@ function EmotionQuestionnaire() {
   const [focusedIndex, setFocusedIndex] = useState(null);
   const [typingIndex, setTypingIndex] = useState(null);
 
-  const [spellChecker, setSpellChecker] = useState(null);
-  const [hasSpellingErrors, setHasSpellingErrors] = useState(false);
-  const [isSpellCheckerLoading, setIsSpellCheckerLoading] = useState(true);
-
   // --- MODIFICATION START ---
   // New state to hold the analysis result.
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -41,39 +33,6 @@ function EmotionQuestionnaire() {
   const answeredQuestionsCount = useMemo(() => {
     return answers.filter(answer => answer.trim() !== '').length;
   }, [answers]);
-
-  useEffect(() => {
-    const loadSpellChecker = async () => {
-      try {
-        const spell = nspell({ aff: enAff, dic: enDic });
-        setSpellChecker(spell);
-      } catch (e) {
-        console.error("Failed to load spell checker:", e);
-      } finally {
-        setIsSpellCheckerLoading(false);
-      }
-    };
-    loadSpellChecker();
-  }, []);
-
-  useEffect(() => {
-    if (!spellChecker || isSpellCheckerLoading || answers.every(a => a.trim() === '')) {
-      setHasSpellingErrors(false);
-      return;
-    }
-
-    const allText = answers.join(' ');
-    const words = allText.match(/\b[a-zA-Z]{2,}\b/g) || [];
-    
-    let foundError = false;
-    for (const word of words) {
-      if (!spellChecker.correct(word)) {
-        foundError = true;
-        break;
-      }
-    }
-    setHasSpellingErrors(foundError);
-  }, [answers, spellChecker, isSpellCheckerLoading]);
 
   const handleAnswerChange = (index, value) => {
     const updated = [...answers];
@@ -93,14 +52,14 @@ function EmotionQuestionnaire() {
   };
 
   const handleSubmit = async () => {
-    if (answeredQuestionsCount < MIN_ANSWERS_REQUIRED || hasSpellingErrors) return;
+    if (answeredQuestionsCount < MIN_ANSWERS_REQUIRED) return;
 
     const answeredResponses = answers.filter(ans => ans.trim() !== '');
     setIsLoading(true);
     setError(null);
     setLoadingMessage('Analyzing your emotions with AI...');
 
-    const apiUrl = 'http://127.0.0.1:5001/predict';
+    const apiUrl = 'https://moodify-haag.onrender.com/predict';
     const payload = { responses: answeredResponses };
 
     try {
@@ -121,11 +80,13 @@ function EmotionQuestionnaire() {
       }
 
       // --- MODIFICATION START ---
-      // Instead of navigating, we set the result in state and stop loading.
+      // Instead of navigating, we set the result in state.
+      // We assume the API provides 'confidence', if not, you can remove that line.
       setAnalysisResult({
         emotion: data.primary_emotion,
-        confidence: data.confidence
+        confidence: data.confidence // Assuming 'confidence' is in the API response
       });
+      // The loading state is turned off here to show the result.
       setIsLoading(false);
       // --- MODIFICATION END ---
 
@@ -144,8 +105,7 @@ function EmotionQuestionnaire() {
     setIsLoading(false);
     setFocusedIndex(null);
     setTypingIndex(null);
-    setHasSpellingErrors(false);
-    setAnalysisResult(null); // Clear the result to show the form again.
+    setAnalysisResult(null); // This clears the result to show the form again
   };
   // --- MODIFICATION END ---
 
@@ -188,13 +148,13 @@ function EmotionQuestionnaire() {
               <div className="absolute inset-0 animate-ping rounded-full h-20 w-20 border border-blue-400 opacity-20"></div>
             </div>
             <h2 className="text-4xl font-semibold text-white animate-pulse mb-4">{loadingMessage}</h2>
-            <p className="text-gray-400 animate-fadeIn text-lg">Harnessing AI to understand your unique emotional state.</p>
+            <p className="text-gray-400 text-lg">Harnessing AI to understand your unique emotional state.</p>
           </div>
         ) : error ? (
           <div className="text-red-500 flex flex-col items-center justify-center h-96 text-center">
             <div className="text-6xl mb-6 animate-bounce">😔</div>
-            <h2 className="text-3xl font-bold mb-6 animate-fadeIn">Analysis Failed</h2>
-            <p className="text-xl text-red-400 mb-10 max-w-lg animate-fadeIn" style={{animationDelay: '0.2s'}}>{error}</p>
+            <h2 className="text-3xl font-bold mb-6">Analysis Failed</h2>
+            <p className="text-xl text-red-400 mb-10 max-w-lg">{error}</p>
             <button
               onClick={resetState}
               className="group py-4 px-10 rounded-2xl border-2 border-red-500 text-red-500 font-semibold hover:bg-red-500 hover:text-white transition-all duration-300 transform hover:scale-105 relative overflow-hidden text-lg"
@@ -206,31 +166,36 @@ function EmotionQuestionnaire() {
           </div>
         ) : analysisResult ? (
           // This is the new block to display the result
-          <div className="flex flex-col items-center justify-center h-96 text-center animate-fadeIn">
+          <div className="flex flex-col items-center justify-center h-96 text-center">
             <h2 className="text-2xl font-medium text-gray-300 mb-2">Analysis Complete</h2>
             <p className="text-gray-400 mb-4">The AI has identified your primary emotion as:</p>
             <h1 className="text-7xl font-bold capitalize bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500 text-transparent bg-clip-text mb-4">
               {analysisResult.emotion}
             </h1>
-            <div className="w-full max-w-md bg-white/5 p-4 rounded-lg mb-8">
-                <div className="flex justify-between items-center mb-1 text-sm">
-                    <span className="text-gray-300 font-medium">Confidence Score</span>
-                    <span className="text-blue-300 font-semibold">
-                        {(analysisResult.confidence * 100).toFixed(1)}%
-                    </span>
-                </div>
-                <div className="w-full bg-black/20 rounded-full h-2.5">
-                    <div 
-                        className="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full" 
-                        style={{ width: `${analysisResult.confidence * 100}%` }}
-                    ></div>
-                </div>
-            </div>
-            <AnimatedButton
+            {/* Conditionally render confidence score if it exists */}
+            {analysisResult.confidence && (
+              <div className="w-full max-w-md bg-white/5 p-4 rounded-lg">
+                  <div className="flex justify-between items-center mb-1 text-sm">
+                      <span className="text-gray-300 font-medium">Confidence Score</span>
+                      <span className="text-blue-300 font-semibold">
+                          {(analysisResult.confidence * 100).toFixed(1)}%
+                      </span>
+                  </div>
+                  <div className="w-full bg-black/20 rounded-full h-2.5">
+                      <div 
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full" 
+                          style={{ width: `${analysisResult.confidence * 100}%` }}
+                      ></div>
+                  </div>
+              </div>
+            )}
+            <button
               onClick={resetState}
+              className="group relative mt-10 py-3 px-8 rounded-xl font-semibold text-base transition-all duration-300 transform overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:scale-105 shadow-lg shadow-blue-600/30"
             >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 group-hover:animate-shimmer"></div>
               <span className="relative z-10">Analyze Again</span>
-            </AnimatedButton>
+            </button>
           </div>
         ) : (
           // This is the original questionnaire form
@@ -253,15 +218,15 @@ function EmotionQuestionnaire() {
                 </span>
               </div>
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-br from-white to-gray-400 text-transparent bg-clip-text mb-2 animate-fadeIn">
+            <h1 className="text-4xl font-bold bg-gradient-to-br from-white to-gray-400 text-transparent bg-clip-text mb-2">
               How Are You Feeling?
             </h1>
-            <p className="text-gray-400 text-base mb-6 animate-fadeIn" style={{animationDelay: '0.2s'}}>
+            <p className="text-gray-400 text-base mb-6">
               Answer at least <strong className="text-blue-300">{MIN_ANSWERS_REQUIRED} questions</strong> for accurate analysis.
             </p>
             <div className="space-y-3 mb-5 text-left">
               {questions.map((q, idx) => (
-                <div key={idx} className="group animate-slideUp" style={{animationDelay: `${0.1 * idx}s`}}>
+                <div key={idx} className="group">
                   <label htmlFor={`q-${idx}`} className={getLabelClasses(idx)}>
                     <span className="flex items-center gap-2 text-sm">
                       <span className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
@@ -281,8 +246,8 @@ function EmotionQuestionnaire() {
                       onFocus={() => handleFocus(idx)}
                       onBlur={handleBlur} 
                       className={getTextareaClasses(idx)}
-                      placeholder={isSpellCheckerLoading ? "Loading dictionary..." : "Your response..."}
-                      disabled={isLoading || isSpellCheckerLoading}
+                      placeholder="Your response..."
+                      disabled={isLoading}
                     />
                     {typingIndex === idx && (
                       <div className="absolute top-2 right-2 flex space-x-1">
@@ -292,7 +257,7 @@ function EmotionQuestionnaire() {
                       </div>
                     )}
                     {answers[idx].trim() && (
-                      <div className="mt-1 text-xs text-emerald-400 animate-fadeIn flex items-center">
+                      <div className="mt-1 text-xs text-emerald-400 flex items-center">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
@@ -306,9 +271,9 @@ function EmotionQuestionnaire() {
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={answeredQuestionsCount < MIN_ANSWERS_REQUIRED || isLoading || hasSpellingErrors}
+              disabled={answeredQuestionsCount < MIN_ANSWERS_REQUIRED || isLoading}
               className={`group relative w-full py-3 px-6 rounded-xl font-semibold text-base transition-all duration-300 transform overflow-hidden ${
-                answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && !hasSpellingErrors
+                answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && !isLoading
                   ? 'bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 hover:from-blue-500 hover:via-purple-500 hover:to-blue-600 hover:scale-105 shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40'
                   : 'bg-gray-800 text-gray-500 cursor-not-allowed'
               }`}
@@ -317,17 +282,13 @@ function EmotionQuestionnaire() {
                 answeredQuestionsCount >= MIN_ANSWERS_REQUIRED ? 'group-hover:animate-shimmer' : ''
               }`}></div>
               <span className="relative z-10 flex items-center justify-center gap-2">
-                Analyze My Mood <span className="text-lg">🎵</span>
+                {isLoading ? 'Analyzing...' : 'Analyze My Mood'}
+                <span className="text-lg">🎵</span>
               </span>
             </button>
             {answeredQuestionsCount < MIN_ANSWERS_REQUIRED && (
               <p className="mt-3 text-sm text-yellow-400">
                 Answer <strong>{MIN_ANSWERS_REQUIRED - answeredQuestionsCount}</strong> more to continue
-              </p>
-            )}
-            {answeredQuestionsCount >= MIN_ANSWERS_REQUIRED && hasSpellingErrors && (
-              <p className="mt-3 text-sm text-red-400">
-                Please correct spelling mistakes before analyzing.
               </p>
             )}
           </div>
