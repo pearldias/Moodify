@@ -9,6 +9,7 @@ from flask_cors import CORS
 import cloudinary
 import cloudinary.uploader
 from bson.objectid import ObjectId
+import re
 
 CORS(app)
 # DNN FACE DETECTOR SETUP
@@ -141,9 +142,14 @@ def analyze():
 
 @app.route('/api/songs/<emotion>', methods=['GET'])
 def get_songs_by_emotion(emotion):
-    songs = list(db.songs_by_emotion.find({"emotion": emotion}))
+    # Create a case-insensitive regex using the 'emotion' variable from the URL
+    regex_emotion = re.compile(f"^{emotion}$", re.IGNORECASE)
+    
+    songs = list(db.songs_by_emotion.find({"emotion": regex_emotion}))
+    
     for song in songs:
         song['_id'] = str(song['_id'])
+        
     return jsonify({"emotion": emotion, "songs": songs}), 200
 
 

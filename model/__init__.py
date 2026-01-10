@@ -12,6 +12,10 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# --- FIX: Use the URI from your .env file (Atlas), NOT localhost ---
+app.config["MONGO_URI"] = os.getenv("MONGO_URI") 
+# ------------------------------------------------------------------
+
 # Enable CORS
 CORS(
     app,
@@ -22,15 +26,13 @@ CORS(
     supports_credentials=True
 )
 
-# Config from env
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
-app.config["MONGO_URI"] = os.getenv("MONGO_URI")
 
 # MongoDB connection
 mongodb_client = PyMongo(app)
 db = mongodb_client.db
 
-# Cloudinary config (reads CLOUDINARY_URL directly from .env)
+# Cloudinary config
 cloudinary.config(
     secure=True
 )
